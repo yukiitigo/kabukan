@@ -1,4 +1,3 @@
-import yfinance as yf
 import httpx
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -6,8 +5,10 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 app = FastAPI()
-app.mount("/static", StaticFiles(directory="static"), name="static")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+HEADERS = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"}
 
 @app.get("/health")
 async def health():
@@ -37,17 +38,26 @@ async def quotes(codes: str = Query(...)):
     cl = [c.strip() for c in codes.split(",") if c.strip()]
     out = []
     for code in cl:
-        t = yf.Ticker(code + ".T")
         try:
-            info = t.fast_info
-            price = info.last_price
-            prev = info.previous_close
-            change = round(price - prev, 1) if price and prev else None
-            pct = round((price - prev) / prev * 100, 2) if price and prev else None
-            hist = t.history(period="1d")
-            vol = int(hist["Volume"].iloc[-1]) if not hist.empty else None
-            name = t.info.get("longName") or t.info.get("shortName") or code
-            out.append({"code": code, "name": name, "price": price, "prevClose": prev, "change": change, "changePct": pct, "volume": vol})
+            async with httpx.AsyncClient(timeout=15) as c:
+                r = await c.get(f"https://finance.yahoo.co.jp/quote/{code}.T",
+                    headers=HEADERS)
+                text = r.text
+                import re
+                price_match = re.search(r'"currentPrice"[^}]*?"value":\s*([\d.]+)', text)
+                prev_match = re.search(r'"previousClose"[^}]*?"value":\s*([\d.]+)', text)
+                name_match = re.search(r'"name":\s*"([^"]+)"', text)
+                vol_match = re.search(r'"volume"[^}]*?"value":\s*([\d.]+)', text)
+                if price_match:
+                    price = float(price_match.group(1))
+                    prev = float(prev_match.group(1)) if prev_match else None
+                    name = name_match.group(1) if name_match else code
+                    vol = int(float(vol_match.group(1))) if vol_match else None
+                    change = round(price - prev, 1) if prev else None
+                    pct = round((price - prev) / prev * 100, 2) if prev else None
+                    out.append({"code": code, "name": name, "price": price, "prevClose": prev, "change": change, "changePct": pct, "volume": vol})
+                else:
+                    out.append({"code": code, "error": "データ取得失敗"})
         except Exception as e:
             out.append({"code": code, "error": str(e)})
     return JSONResponse(content={"quotes": out}, media_type="application/json; charset=utf-8")
@@ -55,10 +65,16 @@ async def quotes(codes: str = Query(...)):
 @app.get("/history/{code}")
 async def history(code: str):
     try:
-        t = yf.Ticker(code + ".T")
-        hist = t.history(period="1mo")
-        dates = [str(d.date()) for d in hist.index]
-        prices = [round(float(p), 1) for p in hist["Close"].tolist()]
-        return JSONResponse(content={"dates": dates, "prices": prices})
+        async with httpx.AsyncClient(timeout=15) as c:
+            r = await c.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{code}.T",
+                params={"interval": "1d", "range": "1mo"},
+                headers={"User-Agent": "Mozilla/5.0"})
+            data = r.json()
+            ts = data["chart"]["result"][0]["timestamp"]
+            closes = data["chart"]["result"][0]["indicators"]["quote"][0]["close"]
+            from datetime import datetime
+            dates = [datetime.fromtimestamp(t).strftime("%Y-%m-%d") for t in ts]
+            prices = [round(float(p), 1) if p else None for p in closes]
+            return JSONResponse(content={"dates": dates, "prices": prices})
     except Exception as e:
         return JSONResponse(content={"dates": [], "prices": [], "error": str(e)})
