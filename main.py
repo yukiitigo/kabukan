@@ -8,8 +8,6 @@ app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-HEADERS = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"}
-
 @app.get("/health")
 async def health():
     return {"status": "ok"}
@@ -39,25 +37,21 @@ async def quotes(codes: str = Query(...)):
     out = []
     for code in cl:
         try:
-            async with httpx.AsyncClient(timeout=15) as c:
-                r = await c.get(f"https://finance.yahoo.co.jp/quote/{code}.T",
-                    headers=HEADERS)
-                text = r.text
-                import re
-                price_match = re.search(r'"currentPrice"[^}]*?"value":\s*([\d.]+)', text)
-                prev_match = re.search(r'"previousClose"[^}]*?"value":\s*([\d.]+)', text)
-                name_match = re.search(r'"name":\s*"([^"]+)"', text)
-                vol_match = re.search(r'"volume"[^}]*?"value":\s*([\d.]+)', text)
-                if price_match:
-                    price = float(price_match.group(1))
-                    prev = float(prev_match.group(1)) if prev_match else None
-                    name = name_match.group(1) if name_match else code
-                    vol = int(float(vol_match.group(1))) if vol_match else None
-                    change = round(price - prev, 1) if prev else None
-                    pct = round((price - prev) / prev * 100, 2) if prev else None
-                    out.append({"code": code, "name": name, "price": price, "prevClose": prev, "change": change, "changePct": pct, "volume": vol})
-                else:
-                    out.append({"code": code, "error": "データ取得失敗"})
+            async with httpx.AsyncClient(timeout=15, follow_redirects=True) as c:
+                r = await c.get(
+                    f"https://query2.finance.yahoo.com/v8/finance/chart/{code}.T",
+                    params={"interval": "1d", "range": "5d"},
+                    headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36", "Accept": "application/json"})
+                data = r.json()
+                result = data["chart"]["result"][0]
+                meta = result["meta"]
+                price = meta.get("regularMarketPrice")
+                prev = meta.get("chartPreviousClose")
+                name = meta.get("longName") or meta.get("shortName") or code
+                vol = meta.get("regularMarketVolume")
+                change = round(price - prev, 1) if price and prev else None
+                pct = round((price - prev) / prev * 100, 2) if price and prev else None
+                out.append({"code": code, "name": name, "price": price, "prevClose": prev, "change": change, "changePct": pct, "volume": vol})
         except Exception as e:
             out.append({"code": code, "error": str(e)})
     return JSONResponse(content={"quotes": out}, media_type="application/json; charset=utf-8")
@@ -65,13 +59,15 @@ async def quotes(codes: str = Query(...)):
 @app.get("/history/{code}")
 async def history(code: str):
     try:
-        async with httpx.AsyncClient(timeout=15) as c:
-            r = await c.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{code}.T",
+        async with httpx.AsyncClient(timeout=15, follow_redirects=True) as c:
+            r = await c.get(
+                f"https://query2.finance.yahoo.com/v8/finance/chart/{code}.T",
                 params={"interval": "1d", "range": "1mo"},
-                headers={"User-Agent": "Mozilla/5.0"})
+                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36", "Accept": "application/json"})
             data = r.json()
-            ts = data["chart"]["result"][0]["timestamp"]
-            closes = data["chart"]["result"][0]["indicators"]["quote"][0]["close"]
+            result = data["chart"]["result"][0]
+            ts = result["timestamp"]
+            closes = result["indicators"]["quote"][0]["close"]
             from datetime import datetime
             dates = [datetime.fromtimestamp(t).strftime("%Y-%m-%d") for t in ts]
             prices = [round(float(p), 1) if p else None for p in closes]
