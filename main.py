@@ -15,19 +15,23 @@ async def health():
 @app.get("/search")
 async def search(q: str = Query(...)):
     try:
+        results = []
         async with httpx.AsyncClient(timeout=10) as c:
-            r = await c.get("https://query1.finance.yahoo.com/v1/finance/search",
-                params={"q": q, "lang": "ja-JP", "region": "JP", "quotesCount": 10},
-                headers={"User-Agent": "Mozilla/5.0"})
-            data = r.json()
-            results = []
-            for item in data.get("quotes", []):
-                symbol = item.get("symbol", "")
-                if symbol.endswith(".T"):
-                    code = symbol.replace(".T", "")
-                    name = item.get("longname") or item.get("shortname") or code
-                    results.append({"code": code, "name": name})
-            return JSONResponse(content={"results": results[:10]}, media_type="application/json; charset=utf-8")
+            for lang in ["ja-JP", "en-US"]:
+                r = await c.get("https://query1.finance.yahoo.com/v1/finance/search",
+                    params={"q": q, "lang": lang, "region": "JP", "quotesCount": 10},
+                    headers={"User-Agent": "Mozilla/5.0"})
+                data = r.json()
+                for item in data.get("quotes", []):
+                    symbol = item.get("symbol", "")
+                    if symbol.endswith(".T"):
+                        code = symbol.replace(".T", "")
+                        name = item.get("longname") or item.get("shortname") or code
+                        if not any(x["code"] == code for x in results):
+                            results.append({"code": code, "name": name})
+                if results:
+                    break
+        return JSONResponse(content={"results": results[:10]}, media_type="application/json; charset=utf-8")
     except Exception as e:
         return JSONResponse(content={"results": [], "error": str(e)})
 
