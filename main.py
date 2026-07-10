@@ -1,15 +1,34 @@
 import httpx
+import os
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import create_engine, Column, String, Float, DateTime
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+from datetime import datetime
 
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+DATABASE_URL = "postgresql://kabukan_db_user:Az24e9htLyLe0ragXvuAWLgfyRzvyXIM@dpg-d95pli6q1p3s73dbm6a0-a/kabukan_db"
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+class Stock(Base):
+    __tablename__ = "stocks"
+    id = Column(String, primary_key=True)
+    code = Column(String, unique=True, index=True)
+    name = Column(String)
+    price = Column(Float)
+
+Base.metadata.create_all(bind=engine)
+
 STOCKS = [
-{"code":"7203","name":"トヨタ自動車"},{"code":"6758","name":"ソニーグループ"},{"code":"9984","name":"ソフトバンクグループ"},{"code":"7974","name":"任天堂"},{"code":"6861","name":"キーエンス"},{"code":"8035","name":"東京エレクトロン"},{"code":"6098","name":"リクルートホールディングス"},{"code":"4063","name":"信越化学工業"},{"code":"7267","name":"本田技研工業"},{"code":"8306","name":"三菱UFJフィナンシャル・グループ"},{"code":"8316","name":"三井住友フィナンシャルグループ"},{"code":"8411","name":"みずほフィナンシャルグループ"},{"code":"9432","name":"日本電信電話"},{"code":"9433","name":"KDDI"},{"code":"9434","name":"ソフトバンク"},{"code":"4519","name":"中外製薬"},{"code":"4568","name":"第一三共"},{"code":"2914","name":"日本たばこ産業"},{"code":"7751","name":"キヤノン"},{"code":"6954","name":"ファナック"},{"code":"6367","name":"ダイキン工業"},{"code":"4661","name":"オリエンタルランド"},{"code":"7741","name":"HOYA"},{"code":"6762","name":"TDK"},{"code":"3382","name":"セブン＆アイ・ホールディングス"},{"code":"8001","name":"伊藤忠商事"},{"code":"8031","name":"三井物産"},{"code":"8058","name":"三菱商事"},{"code":"8053","name":"住友商事"},{"code":"7201","name":"日産自動車"},{"code":"7202","name":"いすゞ自動車"},{"code":"6902","name":"デンソー"},{"code":"6981","name":"村田製作所"},{"code":"6503","name":"三菱電機"},{"code":"6501","name":"日立製作所"},{"code":"6702","name":"富士通"},{"code":"6701","name":"日本電気"},{"code":"4307","name":"野村総合研究所"},{"code":"8725","name":"MS＆ADインシュアランスグループ"},{"code":"8750","name":"第一生命ホールディングス"},{"code":"8766","name":"東京海上ホールディングス"},{"code":"5803","name":"フジクラ"},{"code":"285A","name":"キオクシアホールディングス"},{"code":"7011","name":"三菱重工業"},{"code":"7013","name":"IHI"},{"code":"7012","name":"川崎重工業"},{"code":"6326","name":"クボタ"},{"code":"5401","name":"日本製鉄"},{"code":"5411","name":"JFEホールディングス"},{"code":"4452","name":"花王"},{"code":"4911","name":"資生堂"},{"code":"2502","name":"アサヒグループホールディングス"},{"code":"2503","name":"キリンホールディングス"},{"code":"2801","name":"キッコーマン"},{"code":"9020","name":"東日本旅客鉄道"},{"code":"9022","name":"東海旅客鉄道"},{"code":"9021","name":"西日本旅客鉄道"},{"code":"9101","name":"日本郵船"},{"code":"9104","name":"商船三井"},{"code":"9107","name":"川崎汽船"},{"code":"8802","name":"三菱地所"},{"code":"8801","name":"三井不動産"},{"code":"9501","name":"東京電力ホールディングス"},{"code":"9502","name":"中部電力"},{"code":"9503","name":"関西電力"},{"code":"5016","name":"JX金属"},{"code":"4523","name":"エーザイ"},{"code":"4578","name":"大塚ホールディングス"},{"code":"4151","name":"協和キリン"},{"code":"6645","name":"オムロン"},{"code":"6723","name":"ルネサスエレクトロニクス"},{"code":"8591","name":"オリックス"},{"code":"7309","name":"シマノ"},{"code":"4755","name":"楽天グループ"},{"code":"4689","name":"LINEヤフー"},{"code":"2413","name":"エムスリー"},{"code":"6301","name":"小松製作所"},{"code":"7832","name":"バンダイナムコホールディングス"},{"code":"9766","name":"コナミグループ"},{"code":"2269","name":"明治ホールディングス"},{"code":"2282","name":"日本ハム"},{"code":"8267","name":"イオン"},{"code":"3099","name":"三越伊勢丹ホールディングス"},{"code":"8233","name":"高島屋"}
+{"code":"7203","name":"トヨタ自動車"},{"code":"6758","name":"ソニーグループ"},{"code":"9984","name":"ソフトバンクグループ"},{"code":"7974","name":"任天堂"},{"code":"6861","name":"キーエンス"},{"code":"8035","name":"東京エレクトロン"},{"code":"6098","name":"リクルートホールディングス"},{"code":"4063","name":"信越化学工業"},{"code":"7267","name":"本田技研工業"},{"code":"8306","name":"三菱UFJフィナンシャル・グループ"},{"code":"8316","name":"三井住友フィナンシャルグループ"},{"code":"8411","name":"みずほフィナンシャルグループ"},{"code":"9432","name":"日本電信電話"},{"code":"9433","name":"KDDI"},{"code":"9434","name":"ソフトバンク"},{"code":"4519","name":"中外製薬"},{"code":"4568","name":"第一三共"},{"code":"2914","name":"日本たばこ産業"},{"code":"7751","name":"キヤノン"},{"code":"6954","name":"ファナック"},{"code":"6367","name":"ダイキン工業"},{"code":"4661","name":"オリエンタルランド"},{"code":"7741","name":"HOYA"},{"code":"6762","name":"TDK"},{"code":"3382","name":"セブン＆アイ・ホールディングス"},{"code":"8001","name":"伊藤忠商事"},{"code":"8031","name":"三井物産"},{"code":"8058","name":"三菱商事"},{"code":"8053","name":"住友商事"},{"code":"7201","name":"日産自動車"},{"code":"7202","name":"いすゞ自動車"},{"code":"6902","name":"デンソー"},{"code":"6981","name":"村田製作所"},{"code":"6503","name":"三菱電機"},{"code":"6501","name":"日立製作所"},{"code":"6702","name":"富士通"},{"code":"6701","name":"日本電気"},{"code":"4307","name":"野村総合研究所"},{"code":"8725","name":"MS＆ADインシュアランスグループ"},{"code":"8750","name":"第一生命ホールディングス"},{"code":"8766","name":"東京海上ホールディングス"},{"code":"5803","name":"フジクラ"},{"code":"285A","name":"キオクシアホールディングス"},{"code":"7011","name":"三菱重工業"},{"code":"7013","name":"IHI"},{"code":"7012","name":"川崎重工業"},{"code":"6326","name":"クボタ"},{"code":"5401","name":"日本製鉄"},{"code":"5411","name":"JFEホールディングス"},{"code":"4452","name":"花王"},{"code":"4911","name":"資生堂"},{"code":"2502","name":"アサヒグループホールディングス"},{"code":"2503","name":"キリンホールディングス"},{"code":"2801","name":"キッコーマン"},{"code":"9020","name":"東日本旅客鉄道"},{"code":"9022","name":"東海旅客鉄道"},{"code":"9021","name":"西日本旅客鉄道"},{"code":"9101","name":"日本郵船"},{"code":"9104","name":"商船三井"},{"code":"9107","name":"川崎汽船"},{"code":"8802","name":"三菱地所"},{"code":"8801","name":"三井不動産"},{"code":"9501","name":"東京電力ホールディングス"},{"code":"9502","name":"中部電力"},{"code":"9503","name":"関西電力"},{"code":"5016","name":"JX金属"},{"code":"4523","name":"エーザイ"},{"code":"4578","name":"大塚ホールディングス"},{"code":"4151","name":"協和キリン"},{"code":"6645","name":"オムロン"},{"code":"6723","name":"ルネサスエレクトロニクス"},{"code":"8591","name":"オリックス"},{"code":"7309","name":"シマノ"},{"code":"9602","name":"東宝"},{"code":"4755","name":"楽天グループ"},{"code":"3659","name":"ネクソン"},{"code":"4689","name":"LINEヤフー"},{"code":"2413","name":"エムスリー"},{"code":"6301","name":"小松製作所"},{"code":"7832","name":"バンダイナムコホールディングス"},{"code":"9766","name":"コナミグループ"},{"code":"2269","name":"明治ホールディングス"},{"code":"2282","name":"日本ハム"},{"code":"8267","name":"イオン"},{"code":"3099","name":"三越伊勢丹ホールディングス"},{"code":"8233","name":"高島屋"}
 ]
 
 @app.get("/health")
@@ -91,3 +110,39 @@ async def history(code: str):
             return JSONResponse(content={"dates": dates, "prices": prices})
     except Exception as e:
         return JSONResponse(content={"dates": [], "prices": [], "error": str(e)})
+
+@app.post("/add-stock")
+async def add_stock(code: str = Query(...), name: str = Query(...)):
+    db = SessionLocal()
+    try:
+        stock = Stock(id=f"{code}_{datetime.now().timestamp()}", code=code, name=name, price=0)
+        db.add(stock)
+        db.commit()
+        return {"status": "ok", "code": code}
+    except Exception as e:
+        db.rollback()
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+@app.get("/get-stocks")
+async def get_stocks():
+    db = SessionLocal()
+    try:
+        stocks = db.query(Stock).all()
+        return {"stocks": [{"code": s.code, "name": s.name} for s in stocks]}
+    finally:
+        db.close()
+
+@app.delete("/delete-stock")
+async def delete_stock(code: str = Query(...)):
+    db = SessionLocal()
+    try:
+        db.query(Stock).filter(Stock.code == code).delete()
+        db.commit()
+        return {"status": "ok"}
+    except Exception as e:
+        db.rollback()
+        return {"error": str(e)}
+    finally:
+        db.close()
