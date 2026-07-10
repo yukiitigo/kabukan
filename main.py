@@ -25,6 +25,14 @@ class Stock(Base):
     name = Column(String)
     price = Column(Float)
 
+class Dividend(Base):
+    __tablename__ = "dividends"
+    id = Column(String, primary_key=True)
+    code = Column(String, unique=True, index=True)
+    name = Column(String)
+    annual_dividend = Column(Float)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
 Base.metadata.create_all(bind=engine)
 
 STOCKS = [
@@ -146,3 +154,72 @@ async def delete_stock(code: str = Query(...)):
         return {"error": str(e)}
     finally:
         db.close()
+
+@app.post("/add-dividend")
+async def add_dividend(code: str = Query(...), name: str = Query(...), annual_dividend: float = Query(...)):
+    db = SessionLocal()
+    try:
+        dividend = Dividend(id=f"{code}_{datetime.now().timestamp()}", code=code, name=name, annual_dividend=annual_dividend)
+        db.add(dividend)
+        db.commit()
+        return {"status": "ok", "code": code}
+    except Exception as e:
+        db.rollback()
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+@app.get("/get-dividends")
+async def get_dividends():
+    db = SessionLocal()
+    try:
+        dividends = db.query(Dividend).all()
+        return {"dividends": [{"code": d.code, "name": d.name, "annual_dividend": d.annual_dividend} for d in dividends]}
+    finally:
+        db.close()
+
+@app.delete("/delete-dividend")
+async def delete_dividend(code: str = Query(...)):
+    db = SessionLocal()
+    try:
+        db.query(Dividend).filter(Dividend.code == code).delete()
+        db.commit()
+        return {"status": "ok"}
+    except Exception as e:
+        db.rollback()
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+@app.get("/dividend-yield/{code}")
+async def dividend_yield(code: str):
+    try:
+        async with httpx.AsyncClient(timeout=15, follow_redirects=True) as c:
+            r = await c.get(f"https://query2.finance.yahoo.com/v8/finance/chart/{code}.T",
+                params={"interval": "1d", "range": "2mo"},
+                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36", "Accept": "application/json"})
+            data = r.json()
+            result = data["chart"]["result"][0]
+            ts = result["timestamp"]
+            closes = result["indicators"]["quote"][0]["close"]
+            
+        db = SessionLocal()
+        dividend = db.query(Dividend).filter(Dividend.code == code).first()
+        db.close()
+        
+        if not dividend:
+            return JSONResponse(content={"error": "Dividend not found"})
+        
+        from datetime import datetime
+        dates = [datetime.fromtimestamp(t).strftime("%Y-%m-%d") for t in ts]
+        yields = []
+        for price in closes:
+            if price:
+                yield_pct = round((dividend.annual_dividend / price) * 100, 2)
+                yields.append(yield_pct)
+            else:
+                yields.append(None)
+        
+        return JSONResponse(content={"dates": dates, "yields": yields, "current_yield": yields[-1] if yields[-1] else 0})
+    except Exception as e:
+        return JSONResponse(content={"error": str(e)})
