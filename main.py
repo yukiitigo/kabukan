@@ -31,6 +31,7 @@ class Dividend(Base):
     code = Column(String, unique=True, index=True)
     name = Column(String)
     annual_dividend = Column(Float)
+    purchase_price = Column(Float, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 Base.metadata.create_all(bind=engine)
@@ -156,10 +157,10 @@ async def delete_stock(code: str = Query(...)):
         db.close()
 
 @app.post("/add-dividend")
-async def add_dividend(code: str = Query(...), name: str = Query(...), annual_dividend: float = Query(...)):
+async def add_dividend(code: str = Query(...), name: str = Query(...), annual_dividend: float = Query(...), purchase_price: float = Query(default=0)):
     db = SessionLocal()
     try:
-        dividend = Dividend(id=f"{code}_{datetime.now().timestamp()}", code=code, name=name, annual_dividend=annual_dividend)
+        dividend = Dividend(id=f"{code}_{datetime.now().timestamp()}", code=code, name=name, annual_dividend=annual_dividend, purchase_price=purchase_price)
         db.add(dividend)
         db.commit()
         return {"status": "ok", "code": code}
@@ -174,7 +175,7 @@ async def get_dividends():
     db = SessionLocal()
     try:
         dividends = db.query(Dividend).all()
-        return {"dividends": [{"code": d.code, "name": d.name, "annual_dividend": d.annual_dividend} for d in dividends]}
+        return {"dividends": [{"code": d.code, "name": d.name, "annual_dividend": d.annual_dividend, "purchase_price": d.purchase_price} for d in dividends]}
     finally:
         db.close()
 
@@ -222,21 +223,4 @@ async def dividend_yield(code: str):
         
         return JSONResponse(content={"dates": dates, "yields": yields, "current_yield": yields[-1] if yields[-1] else 0})
     except Exception as e:
-        return JSONResponse(content={"error": str(e)})
-
-@app.get("/dividend-yield-at-purchase/{code}")
-async def dividend_yield_at_purchase(code: str):
-    db = SessionLocal()
-    try:
-        dividend = db.query(Dividend).filter(Dividend.code == code).first()
-        if not dividend:
-            return JSONResponse(content={"error": "Dividend not found"})
-        db.close()
-        
-        # 保有株から取得単価を取得する（Holdテーブルにアクセス）
-        # ここでは、localStorageから取得した保有株データを使用するため、フロントエンドで計算する
-        # バックエンドでは年間配当金を返すのみ
-        return JSONResponse(content={"annual_dividend": dividend.annual_dividend})
-    except Exception as e:
-        db.close()
         return JSONResponse(content={"error": str(e)})
