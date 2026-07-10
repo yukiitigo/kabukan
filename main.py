@@ -223,3 +223,20 @@ async def dividend_yield(code: str):
         return JSONResponse(content={"dates": dates, "yields": yields, "current_yield": yields[-1] if yields[-1] else 0})
     except Exception as e:
         return JSONResponse(content={"error": str(e)})
+
+@app.get("/dividend-yield-at-purchase/{code}")
+async def dividend_yield_at_purchase(code: str):
+    db = SessionLocal()
+    try:
+        dividend = db.query(Dividend).filter(Dividend.code == code).first()
+        if not dividend:
+            return JSONResponse(content={"error": "Dividend not found"})
+        db.close()
+        
+        # 保有株から取得単価を取得する（Holdテーブルにアクセス）
+        # ここでは、localStorageから取得した保有株データを使用するため、フロントエンドで計算する
+        # バックエンドでは年間配当金を返すのみ
+        return JSONResponse(content={"annual_dividend": dividend.annual_dividend})
+    except Exception as e:
+        db.close()
+        return JSONResponse(content={"error": str(e)})
