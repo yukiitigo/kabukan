@@ -79,7 +79,7 @@ async def quotes(codes: str = Query(...)):
                 meta = result["meta"]
                 price = meta.get("regularMarketPrice")
                 prev = meta.get("chartPreviousClose")
-                name = next((s["name"] for s in STOCKS if s["code"]==code), None) or meta.get("longName") or meta.get("shortName") or code
+                name = next((s["name"] for s in STOCKS if s["code"]==code), None) or code
                 vol = meta.get("regularMarketVolume")
                 closes = result["indicators"]["quote"][0]["close"]
                 closes = [p for p in closes if p is not None]
