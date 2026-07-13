@@ -223,3 +223,4 @@ async def dividend_yield(code: str):
         
         return JSONResponse(content={"dates": dates, "yields": yields, "current_yield": yields[-1] if yields[-1] else 0})
     except Exception as e:
+        return JSONResponse(content={"error": str(e)})
