@@ -46,6 +46,7 @@ async def reset_dividends():
     try:
         from sqlalchemy import text
         db.execute(text("DROP TABLE IF EXISTS dividends CASCADE"))
+        db.commit()
         Dividend.__table__.create(bind=engine)
         db.commit()
         return {"status": "dividends table reset"}
