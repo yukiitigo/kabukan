@@ -132,7 +132,8 @@ async def history(code: str):
             from datetime import datetime
             dates = [datetime.fromtimestamp(t).strftime("%Y-%m-%d") for t in ts]
             prices = [round(float(p), 1) if p else None for p in closes]
-            return JSONResponse(content={"dates": dates, "prices": prices})
+            volumes = result["indicators"]["quote"][0].get("volume", [])
+            return JSONResponse(content={"dates": dates, "prices": prices, "volumes": volumes})
     except Exception as e:
         return JSONResponse(content={"dates": [], "prices": [], "error": str(e)})
 
