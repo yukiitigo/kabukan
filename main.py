@@ -238,6 +238,43 @@ async def delete_dividend(code: str = Query(...)):
     finally:
         db.close()
 
+@app.get("/fair-value/{code}")
+async def fair_value(code: str):
+    try:
+        statements = get_jquants_financial_data(code)
+        if not statements:
+            return JSONResponse(content={"error": "no financial data"})
+        per_list = []
+        pbr_list = []
+        latest_bps = None
+        latest_eps = None
+        for s in statements:
+            doc_type = s.get("DocType", "")
+            disc_date = s.get("DiscDate")
+            eps = s.get("EPS")
+            bps = s.get("BPS")
+            if "FY" in doc_type and bps:
+                price = get_jquants_price_on_date(code, disc_date.replace("-", ""))
+                if price and eps and float(eps) != 0:
+                    per_list.append(price / float(eps))
+                if price and bps and float(bps) != 0:
+                    pbr_list.append(price / float(bps))
+                if latest_bps is None:
+                    latest_bps = float(bps)
+            if eps and latest_eps is None and "FY" in doc_type:
+                latest_eps = float(eps)
+        if not per_list or not pbr_list or latest_bps is None or latest_eps is None:
+            return JSONResponse(content={"error": "insufficient data"})
+        avg_per = sum(per_list) / len(per_list)
+        avg_pbr = sum(pbr_list) / len(pbr_list)
+        fair_price_per = latest_eps * avg_per
+        fair_price_pbr = latest_bps * avg_pbr
+        fair_price = (fair_price_per + fair_price_pbr) / 2
+        return JSONResponse(content={"fair_price": round(fair_price, 1), "avg_per": round(avg_per, 2), "avg_pbr": round(avg_pbr, 2), "latest_eps": latest_eps, "latest_bps": latest_bps, "sample_size": len(per_list)})
+    except Exception as e:
+        return JSONResponse(content={"error": str(e)})
+
+
 @app.get("/dividend-yield/{code}")
 async def dividend_yield(code: str):
     try:
