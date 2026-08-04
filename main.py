@@ -244,33 +244,53 @@ async def fair_value(code: str):
         statements = get_jquants_financial_data(code)
         if not statements:
             return JSONResponse(content={"error": "no financial data"})
-        per_list = []
-        pbr_list = []
-        latest_bps = None
-        latest_eps = None
-        for s in statements:
-            doc_type = s.get("DocType", "")
-            disc_date = s.get("DiscDate")
-            eps = s.get("EPS")
-            bps = s.get("BPS")
-            if "FY" in doc_type and bps:
-                price = get_jquants_price_on_date(code, disc_date.replace("-", ""))
-                if price and eps and float(eps) != 0:
-                    per_list.append(price / float(eps))
-                if price and bps and float(bps) != 0:
-                    pbr_list.append(price / float(bps))
-                if latest_bps is None:
-                    latest_bps = float(bps)
-            if eps and latest_eps is None and "FY" in doc_type:
-                latest_eps = float(eps)
-        if not per_list or not pbr_list or latest_bps is None or latest_eps is None:
+        fy_records = [s for s in statements if "FY" in s.get("DocType", "") and s.get("NP") and s.get("Eq")]
+        fy_records.sort(key=lambda x: x.get("DiscDate", ""), reverse=True)
+        if len(fy_records) < 1:
             return JSONResponse(content={"error": "insufficient data"})
-        avg_per = sum(per_list) / len(per_list)
-        avg_pbr = sum(pbr_list) / len(pbr_list)
-        fair_price_per = latest_eps * avg_per
-        fair_price_pbr = latest_bps * avg_pbr
-        fair_price = (fair_price_per + fair_price_pbr) / 2
-        return JSONResponse(content={"fair_price": round(fair_price, 1), "avg_per": round(avg_per, 2), "avg_pbr": round(avg_pbr, 2), "latest_eps": latest_eps, "latest_bps": latest_bps, "sample_size": len(per_list)})
+        latest = fy_records[0]
+        roe = None
+        if latest.get("NP") and latest.get("Eq") and float(latest["Eq"]) != 0:
+            roe = float(latest["NP"]) / float(latest["Eq"]) * 100
+        equity_ratio = float(latest["EqAR"]) * 100 if latest.get("EqAR") else None
+        op_margin = None
+        if latest.get("OP") and latest.get("Sales") and float(latest["Sales"]) != 0:
+            op_margin = float(latest["OP"]) / float(latest["Sales"]) * 100
+        profit_trend = None
+        if len(fy_records) >= 2:
+            prev_np = fy_records[1].get("NP")
+            if prev_np and latest.get("NP"):
+                profit_trend = "増益" if float(latest["NP"]) > float(prev_np) else "減益"
+        score = 0
+        reasons = []
+        if roe is not None:
+            if roe >= 15:
+                score += 1
+                reasons.append("ROE15%以上")
+            elif roe < 5:
+                reasons.append("ROE5%未満")
+        if equity_ratio is not None:
+            if equity_ratio >= 40:
+                score += 1
+                reasons.append("自己資本比率40%以上")
+            elif equity_ratio < 20:
+                reasons.append("自己資本比率20%未満")
+        if profit_trend == "増益":
+            score += 1
+            reasons.append("増益トレンド")
+        elif profit_trend == "減益":
+            reasons.append("減益トレンド")
+        if op_margin is not None:
+            if op_margin >= 10:
+                score += 1
+                reasons.append("営業利益率10%以上")
+        if score >= 3:
+            rating = "優良"
+        elif score >= 2:
+            rating = "普通"
+        else:
+            rating = "要注意"
+        return JSONResponse(content={"rating": rating, "score": score, "roe": round(roe, 1) if roe is not None else None, "equity_ratio": round(equity_ratio, 1) if equity_ratio is not None else None, "op_margin": round(op_margin, 1) if op_margin is not None else None, "profit_trend": profit_trend, "reasons": reasons})
     except Exception as e:
         return JSONResponse(content={"error": str(e)})
 
