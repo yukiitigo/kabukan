@@ -264,9 +264,11 @@ async def fair_value(code: str):
         score = 0
         reasons = []
         if roe is not None:
-            if roe >= 15:
+            if 15 <= roe <= 30:
                 score += 1
-                reasons.append("ROE15%以上")
+                reasons.append("ROE15-30%（優良水準）")
+            elif roe > 30:
+                reasons.append("ROE30%超（レバレッジ過多の可能性、要確認）")
             elif roe < 5:
                 reasons.append("ROE5%未満")
         if equity_ratio is not None:
@@ -274,7 +276,7 @@ async def fair_value(code: str):
                 score += 1
                 reasons.append("自己資本比率40%以上")
             elif equity_ratio < 20:
-                reasons.append("自己資本比率20%未満")
+                reasons.append("自己資本比率20%未満（財務レバレッジ高）")
         if profit_trend == "増益":
             score += 1
             reasons.append("増益トレンド")
@@ -290,7 +292,45 @@ async def fair_value(code: str):
             rating = "普通"
         else:
             rating = "要注意"
-        return JSONResponse(content={"rating": rating, "score": score, "roe": round(roe, 1) if roe is not None else None, "equity_ratio": round(equity_ratio, 1) if equity_ratio is not None else None, "op_margin": round(op_margin, 1) if op_margin is not None else None, "profit_trend": profit_trend, "reasons": reasons})
+
+        per_list = []
+        pbr_list = []
+        latest_bps = None
+        latest_eps = None
+        for s in fy_records:
+            disc_date = s.get("DiscDate")
+            eps = s.get("EPS")
+            bps = s.get("BPS")
+            if bps:
+                price = get_jquants_price_on_date(code, disc_date.replace("-", ""))
+                if price and eps and float(eps) != 0:
+                    per_list.append(price / float(eps))
+                if price and bps and float(bps) != 0:
+                    pbr_list.append(price / float(bps))
+                if latest_bps is None:
+                    latest_bps = float(bps)
+            if eps and latest_eps is None:
+                latest_eps = float(eps)
+        valuation = None
+        fair_price = None
+        avg_per = None
+        avg_pbr = None
+        if per_list and pbr_list and latest_bps and latest_eps:
+            avg_per = sum(per_list) / len(per_list)
+            avg_pbr = sum(pbr_list) / len(pbr_list)
+            fair_price = (latest_eps * avg_per + latest_bps * avg_pbr) / 2
+
+        return JSONResponse(content={
+            "rating": rating, "score": score,
+            "roe": round(roe, 1) if roe is not None else None,
+            "equity_ratio": round(equity_ratio, 1) if equity_ratio is not None else None,
+            "op_margin": round(op_margin, 1) if op_margin is not None else None,
+            "profit_trend": profit_trend, "reasons": reasons,
+            "fair_price": round(fair_price, 1) if fair_price else None,
+            "avg_per": round(avg_per, 2) if avg_per else None,
+            "avg_pbr": round(avg_pbr, 2) if avg_pbr else None,
+            "sample_size": len(per_list)
+        })
     except Exception as e:
         return JSONResponse(content={"error": str(e)})
 
