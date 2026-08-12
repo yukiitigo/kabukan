@@ -297,11 +297,11 @@ function rcls(x){return x==='判定不能'?'cgray':(x==='優良'||x==='買い候
 function showFund(code){var fv=FVMAP[code],q=QMAP[code]||{};
 if(!fv){openInfo('ファンダメンタルズ判定','<p class="cnote">財務データを取得中です。数秒後にもう一度タップしてください。</p>');return}
 if(fv.error){openInfo('ファンダメンタルズ判定','<p class="cnote">財務データを取得できませんでした。<br>('+fv.error+')</p>');return}
-var h='<div class="chead"><div class="clab">指標</div><div class="cval">実測値</div><div class="crule">判定基準</div><div class="cok">達成</div></div>';
-h+=ckrow('ROE',fv.roe!=null?fv.roe+'%':'--','15〜30%',fv.roe!=null&&fv.roe>=15&&fv.roe<=30,'自己資本利益率。純利益÷自己資本。株主が預けたお金で年に何%稼いだかを示す。高いほど資本効率が良い');
-h+=ckrow('自己資本比率',fv.equity_ratio!=null?fv.equity_ratio+'%':'--','40%以上',fv.equity_ratio!=null&&fv.equity_ratio>=40,'総資産のうち返済不要な自分のお金が占める割合。高いほど 借金に頼らず財務が安全');
+var RL=(fv.roe_lo!=null?fv.roe_lo:15),RH=(fv.roe_hi!=null?fv.roe_hi:30),EM=(fv.eqr_min!=null?fv.eqr_min:40),ML=(fv.margin_label||'営業利益率'),MV=(fv.margin_val!=null?fv.margin_val:fv.op_margin),MM=(fv.margin_min!=null?fv.margin_min:10);var h='<div class="chead"><div class="clab">指標</div><div class="cval">実測値</div><div class="crule">判定基準</div><div class="cok">達成</div></div>';
+h+=ckrow('ROE',fv.roe!=null?fv.roe+'%':'--',RL+'〜'+RH+'%',fv.roe!=null&&fv.roe>=RL&&fv.roe<=RH,'自己資本利益率。純利益÷自己資本。株主が預けたお金で年に何%稼いだかを示す。高いほど資本効率が良い');
+h+=ckrow('自己資本比率',fv.equity_ratio!=null?fv.equity_ratio+'%':'--',EM+'%以上',fv.equity_ratio!=null&&fv.equity_ratio>=EM,'総資産のうち返済不要な自分のお金が占める割合。高いほど 借金に頼らず財務が安全');
 h+=ckrow('純利益トレンド',fv.profit_trend||'--','前期比で増益',fv.profit_trend==='増益','税金まで引いた最終的な儲けが、前の決算期より増えたか減ったか');
-h+=ckrow('営業利益率',fv.op_margin!=null?fv.op_margin+'%':'--','10%以上',fv.op_margin!=null&&fv.op_margin>=10,'売上のうち本業で残る利益の割合。高いほど値下げ競争に巻き込まれにくい');
+h+=ckrow(ML,MV!=null?MV+'%':'--',MM+'%以上',MV!=null&&MV>=MM,ML==='純利益率'?'売上のうち最終的に手元に残る利益の割合。商社は薄利多売が構造的なため、営業利益率ではなくこちらで評価する':'売上のうち本業で残る利益の割合。高いほど値下げ競争に巻き込まれにくい');
 h+='<div class="cscore">スコア <b>'+fv.score+' / 4</b>　→　<b class="'+rcls(fv.rating)+'">'+fv.rating+'</b></div>';
 h+='<p class="cnote">3点以上 = 優良 ／ 2点 = 普通 ／ 1点以下 = 要注意<br>※ROEが30%を超える場合は財務レバレッジ過多の可能性があるため加点しません。'+(fv.available!=null&&fv.available<4?'<br>※財務データから評価できたのは '+fv.available+' / 4 項目です。':'')+(fv.rating==='判定不能'?'<br><b>※評価可能な指標が3項目未満のため、判定を保留しています。</b>':'')+'</p>';
 if(fv.fair_price){h+='<div class="csec">理論株価（過去平均PER・PBRの平均法）</div>';
@@ -311,7 +311,7 @@ h+='<div class="crow2"><span>平均PER</span><b>'+fv.avg_per+'倍</b></div>';
 h+='<div class="crow2"><span>平均PBR</span><b>'+fv.avg_pbr+'倍</b></div>';
 h+='<div class="crow2"><span>算出サンプル</span><b>'+fv.sample_size+'期分</b></div>'}
 if(fv.reasons&&fv.reasons.length){h+='<div class="csec">判定理由</div><ul class="clist">'+fv.reasons.map(function(x){return '<li>'+x+'</li>'}).join('')+'</ul>'}
-openInfo('ファンダメンタルズ判定',h)}
+openInfo('ファンダメンタルズ判定'+(fv.profile&&fv.profile!=='標準'?'（'+fv.profile+'基準）':''),h)}
 function showJudge(code){var q=QMAP[code];
 if(!q){openInfo('売買判定','<p class="cnote">株価データを取得中です。数秒後にもう一度タップしてください。</p>');return}
 var dv=q.deviation,vo=q.volume,av=q.avgVolume;

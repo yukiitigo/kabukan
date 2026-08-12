@@ -41,6 +41,8 @@ def get_jquants_price_on_date(code, date_str):
     except Exception:
         return None
 
+TRADING_CO = {"8001","8002","8015","8031","8053","8058","2768"}
+
 STOCKS = [
 {"code":"7203","name":"トヨタ自動車"},{"code":"6758","name":"ソニーグループ"},{"code":"9984","name":"ソフトバンクグループ"},{"code":"7974","name":"任天堂"},{"code":"6861","name":"キーエンス"},{"code":"8035","name":"東京エレクトロン"},{"code":"6098","name":"リクルートホールディングス"},{"code":"4063","name":"信越化学工業"},{"code":"7267","name":"本田技研工業"},{"code":"8306","name":"三菱UFJフィナンシャル・グループ"},{"code":"8316","name":"三井住友フィナンシャルグループ"},{"code":"8411","name":"みずほフィナンシャルグループ"},{"code":"9432","name":"日本電信電話"},{"code":"9433","name":"KDDI"},{"code":"9434","name":"ソフトバンク"},{"code":"4519","name":"中外製薬"},{"code":"4568","name":"第一三共"},{"code":"2914","name":"日本たばこ産業"},{"code":"7751","name":"キヤノン"},{"code":"6954","name":"ファナック"},{"code":"6367","name":"ダイキン工業"},{"code":"4661","name":"オリエンタルランド"},{"code":"7741","name":"HOYA"},{"code":"6762","name":"TDK"},{"code":"3382","name":"セブン＆アイ・ホールディングス"},{"code":"8001","name":"伊藤忠商事"},{"code":"8031","name":"三井物産"},{"code":"8058","name":"三菱商事"},{"code":"8053","name":"住友商事"},{"code":"7201","name":"日産自動車"},{"code":"7202","name":"いすゞ自動車"},{"code":"6902","name":"デンソー"},{"code":"6981","name":"村田製作所"},{"code":"6503","name":"三菱電機"},{"code":"6501","name":"日立製作所"},{"code":"6702","name":"富士通"},{"code":"6701","name":"日本電気"},{"code":"4307","name":"野村総合研究所"},{"code":"8725","name":"MS＆ADインシュアランスグループ"},{"code":"8750","name":"第一生命ホールディングス"},{"code":"8766","name":"東京海上ホールディングス"},{"code":"5803","name":"フジクラ"},{"code":"285A","name":"キオクシアホールディングス"},{"code":"7011","name":"三菱重工業"},{"code":"7013","name":"IHI"},{"code":"7012","name":"川崎重工業"},{"code":"6326","name":"クボタ"},{"code":"5401","name":"日本製鉄"},{"code":"5445","name":"東京鐵鋼"},{"code":"4452","name":"花王"},{"code":"4911","name":"資生堂"},{"code":"2502","name":"アサヒグループホールディングス"},{"code":"2503","name":"キリンホールディングス"},{"code":"2801","name":"キッコーマン"},{"code":"9020","name":"東日本旅客鉄道"},{"code":"9022","name":"東海旅客鉄道"},{"code":"9021","name":"西日本旅客鉄道"},{"code":"9101","name":"日本郵船"},{"code":"9104","name":"商船三井"},{"code":"9107","name":"川崎汽船"},{"code":"8802","name":"三菱地所"},{"code":"8801","name":"三井不動産"},{"code":"9501","name":"東京電力ホールディングス"},{"code":"9502","name":"中部電力"},{"code":"9503","name":"関西電力"},{"code":"5016","name":"JX金属"},{"code":"4523","name":"エーザイ"},{"code":"4578","name":"大塚ホールディングス"},{"code":"4151","name":"協和キリン"},{"code":"6645","name":"オムロン"},{"code":"6723","name":"ルネサスエレクトロニクス"},{"code":"8591","name":"オリックス"},{"code":"7309","name":"シマノ"},{"code":"9602","name":"東宝"},{"code":"4755","name":"楽天グループ"},{"code":"3659","name":"ネクソン"},{"code":"4689","name":"LINEヤフー"},{"code":"2413","name":"エムスリー"},{"code":"6301","name":"小松製作所"},{"code":"7832","name":"バンダイナムコホールディングス"},{"code":"9766","name":"コナミグループ"},{"code":"2269","name":"明治ホールディングス"},{"code":"2282","name":"日本ハム"},{"code":"8267","name":"イオン"},{"code":"3099","name":"三越伊勢丹ホールディングス"},{"code":"8233","name":"高島屋"},{"code":"6920","name":"レーザーテック"},{"code":"6857","name":"アドバンテスト"},{"code":"6146","name":"ディスコ"},{"code":"4023","name":"クレスコ"},{"code":"3653","name":"ボーダー"},{"code":"3906","name":"HANATOUR"},{"code":"3932","name":"アロン"},{"code":"4768","name":"大塚ホールディングス"},{"code":"6702","name":"富士通"},{"code":"9684","name":"スクウェア・エニックス"},{"code":"6981","name":"村田製作所"},{"code":"6728","name":"アルバック"},{"code":"9470","name":"東京オリンピック"},{"code":"6741","name":"日本テレコム"},{"code":"9433","name":"KDDI"},{"code":"3753","name":"フレアス"},{"code":"6753","name":"シャープ"},{"code":"4967","name":"小松製作所"},{"code":"7731","name":"ニコン"},{"code":"6273","name":"SMC"},{"code":"6954","name":"ファナック"},{"code":"7226","name":"極東開発工業"},{"code":"6463","name":"TPR"},{"code":"1414","name":"ショーボンドホールディングス"},{"code":"6718","name":"アイホン"}
 ]
@@ -153,20 +155,27 @@ async def fair_value(code: str):
             prev_np = fy_records[1].get("NP")
             if prev_np and latest.get("NP"):
                 profit_trend = "増益" if float(latest["NP"]) > float(prev_np) else "減益"
+        net_margin = None
+        if latest.get("NP") and latest.get("Sales") and float(latest["Sales"]) != 0:
+            net_margin = float(latest["NP"]) / float(latest["Sales"]) * 100
+        profile = "商社" if str(code) in TRADING_CO else "標準"
+        roe_lo, eqr_min = (10, 30) if profile == "商社" else (15, 40)
+        roe_hi = 30
+        margin_val, margin_min, margin_label = (net_margin, 3, "純利益率") if profile == "商社" else (op_margin, 10, "営業利益率")
         score = 0
         reasons = []
         if roe is not None:
-            if 15 <= roe <= 30:
+            if roe_lo <= roe <= roe_hi:
                 score += 1
-                reasons.append("ROE15-30%（優良水準）")
-            elif roe > 30:
+                reasons.append(f"ROE{roe_lo}-{roe_hi}%（優良水準）")
+            elif roe > roe_hi:
                 reasons.append("ROE30%超（レバレッジ過多の可能性、要確認）")
             elif roe < 5:
                 reasons.append("ROE5%未満")
         if equity_ratio is not None:
-            if equity_ratio >= 40:
+            if equity_ratio >= eqr_min:
                 score += 1
-                reasons.append("自己資本比率40%以上")
+                reasons.append(f"自己資本比率{eqr_min}%以上")
             elif equity_ratio < 20:
                 reasons.append("自己資本比率20%未満（財務レバレッジ高）")
         if profit_trend == "増益":
@@ -174,11 +183,12 @@ async def fair_value(code: str):
             reasons.append("増益トレンド")
         elif profit_trend == "減益":
             reasons.append("減益トレンド")
-        if op_margin is not None:
-            if op_margin >= 10:
-                score += 1
-                reasons.append("営業利益率10%以上")
-        available = sum(1 for x in [roe, equity_ratio, op_margin, profit_trend] if x is not None)
+        if margin_val is not None and margin_val >= margin_min:
+            score += 1
+            reasons.append(f"{margin_label}{margin_min}%以上")
+        if profile == "商社":
+            reasons.append("商社プロファイルで判定（低マージン・高レバレッジ構造を考慮）")
+        available = sum(1 for x in [roe, equity_ratio, margin_val, profit_trend] if x is not None)
         if available < 3:
             rating = "判定不能"
         elif score >= 3:
@@ -216,7 +226,10 @@ async def fair_value(code: str):
             fair_price = (latest_eps * avg_per + latest_bps * avg_pbr) / 2
 
         return JSONResponse(content={
-            "rating": rating, "score": score, "available": available,
+            "rating": rating, "score": score, "available": available, "profile": profile,
+            "roe_lo": roe_lo, "roe_hi": roe_hi, "eqr_min": eqr_min,
+            "margin_label": margin_label, "margin_min": margin_min,
+            "margin_val": round(margin_val, 1) if margin_val is not None else None,
             "roe": round(roe, 1) if roe is not None else None,
             "equity_ratio": round(equity_ratio, 1) if equity_ratio is not None else None,
             "op_margin": round(op_margin, 1) if op_margin is not None else None,
