@@ -271,3 +271,45 @@ async def dividend_yield(code: str, dividend: float = 0):
         return JSONResponse(content={"dates": dates, "yields": yields, "current_yield": (yields[-1] or 0) if yields else 0})
     except Exception as e:
         return JSONResponse(content={"error": str(e)})
+
+
+@app.get("/verify-stocks")
+async def verify_stocks():
+    import collections
+    headers = {"x-api-key": JQUANTS_API_KEY}
+    used, items = None, []
+    for url in ["https://api.jquants.com/v2/equities/info",
+                "https://api.jquants.com/v2/listed/info",
+                "https://api.jquants.com/v1/listed/info"]:
+        try:
+            r = requests.get(url, headers=headers, timeout=30)
+            if r.status_code == 200:
+                j = r.json()
+                items = j.get("data") or j.get("info") or []
+                if items:
+                    used = url
+                    break
+        except Exception:
+            pass
+    if not items:
+        return JSONResponse(content={"error": "listed info not available"})
+    master = {}
+    for it in items:
+        c = str(it.get("Code") or it.get("code") or "")
+        n = it.get("CompanyName") or it.get("Name") or it.get("name") or ""
+        if c:
+            master[c] = n
+            if len(c) == 5 and c.endswith("0"):
+                master[c[:4]] = n
+    dup = [c for c, k in collections.Counter(s["code"] for s in STOCKS).items() if k > 1]
+    notfound, mismatch = [], []
+    for s in STOCKS:
+        official = master.get(s["code"])
+        if official is None:
+            notfound.append(s["code"] + " " + s["name"])
+        elif official.replace(" ", "").replace("　", "") != s["name"].replace(" ", "").replace("　", ""):
+            mismatch.append({"code": s["code"], "app": s["name"], "official": official})
+    return JSONResponse(content={"endpoint": used, "total": len(STOCKS),
+                                 "dup_count": len(dup), "duplicates": dup,
+                                 "notfound_count": len(notfound), "not_found": notfound,
+                                 "mismatch_count": len(mismatch), "name_mismatch": mismatch})
