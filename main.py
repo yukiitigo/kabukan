@@ -224,7 +224,7 @@ async def fair_value(code: str):
 
 
 @app.get("/dividend-yield/{code}")
-async def dividend_yield(code: str):
+async def dividend_yield(code: str, dividend: float = 0):
     try:
         async with httpx.AsyncClient(timeout=15, follow_redirects=True) as c:
             r = await c.get(f"https://query2.finance.yahoo.com/v8/finance/chart/{code}.T",
@@ -235,23 +235,19 @@ async def dividend_yield(code: str):
             ts = result["timestamp"]
             closes = result["indicators"]["quote"][0]["close"]
             
-        db = SessionLocal()
-        dividend = db.query(Dividend).filter(Dividend.code == code).first()
-        db.close()
-        
-        if not dividend:
-            return JSONResponse(content={"error": "Dividend not found"})
+        if not dividend or dividend <= 0:
+            return JSONResponse(content={"error": "dividend param required"})
         
         from datetime import datetime
         dates = [datetime.fromtimestamp(t).strftime("%Y-%m-%d") for t in ts]
         yields = []
         for price in closes:
             if price:
-                yield_pct = round((dividend.annual_dividend / price) * 100, 2)
+                yield_pct = round((dividend / price) * 100, 2)
                 yields.append(yield_pct)
             else:
                 yields.append(None)
         
-        return JSONResponse(content={"dates": dates, "yields": yields, "current_yield": yields[-1] if yields[-1] else 0})
+        return JSONResponse(content={"dates": dates, "yields": yields, "current_yield": (yields[-1] or 0) if yields else 0})
     except Exception as e:
         return JSONResponse(content={"error": str(e)})
