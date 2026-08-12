@@ -88,18 +88,22 @@ async def quotes(codes: str = Query(...)):
                 vol = meta.get("regularMarketVolume")
                 closes = result["indicators"]["quote"][0]["close"]
                 closes = [p for p in closes if p is not None]
-                ma25 = sum(closes[-25:]) / min(25, len(closes)) if len(closes) >= 5 else None
+                ma25 = sum(closes[-25:]) / min(25, len(closes)) if len(closes) >= 20 else None
                 deviation = round((price - ma25) / ma25 * 100, 2) if ma25 and price else None
-                avg_vol = sum([v for v in result["indicators"]["quote"][0].get("volume",[]) if v]) / max(1, len([v for v in result["indicators"]["quote"][0].get("volume",[]) if v]))
-                if deviation is not None:
-                    if deviation < -5 and vol and vol > avg_vol:
+                _vhist = [v for v in result["indicators"]["quote"][0].get("volume", []) if v]
+                _vhist = _vhist[:-1][-25:] if len(_vhist) > 1 else []
+                avg_vol = (sum(_vhist) / len(_vhist)) if _vhist else None
+                if ma25 is None:
+                    judgment = "判定不能"
+                elif deviation is not None:
+                    if deviation < -5 and vol and avg_vol and vol > avg_vol:
                         judgment = "買い候補"
                     elif deviation > 10:
                         judgment = "警戒"
                     else:
                         judgment = "中立"
                 else:
-                    judgment = "中立"
+                    judgment = "判定不能"
                 change = round(price - prev, 1) if price and prev else None
                 pct = round((price - prev) / prev * 100, 2) if price and prev else None
                 out.append({"code": code, "name": name, "price": price, "prevClose": prev, "change": change, "changePct": pct, "volume": vol, "deviation": deviation, "judgment": judgment, "ma25": round(ma25, 1) if ma25 else None, "avgVolume": round(avg_vol) if avg_vol else None})
@@ -174,7 +178,10 @@ async def fair_value(code: str):
             if op_margin >= 10:
                 score += 1
                 reasons.append("営業利益率10%以上")
-        if score >= 3:
+        available = sum(1 for x in [roe, equity_ratio, op_margin, profit_trend] if x is not None)
+        if available < 3:
+            rating = "判定不能"
+        elif score >= 3:
             rating = "優良"
         elif score >= 2:
             rating = "普通"
@@ -191,9 +198,9 @@ async def fair_value(code: str):
             bps = s.get("BPS")
             if bps:
                 price = get_jquants_price_on_date(code, disc_date.replace("-", ""))
-                if price and eps and float(eps) != 0:
+                if price and eps and float(eps) > 0:
                     per_list.append(price / float(eps))
-                if price and bps and float(bps) != 0:
+                if price and bps and float(bps) > 0:
                     pbr_list.append(price / float(bps))
                 if latest_bps is None:
                     latest_bps = float(bps)
@@ -209,7 +216,7 @@ async def fair_value(code: str):
             fair_price = (latest_eps * avg_per + latest_bps * avg_pbr) / 2
 
         return JSONResponse(content={
-            "rating": rating, "score": score,
+            "rating": rating, "score": score, "available": available,
             "roe": round(roe, 1) if roe is not None else None,
             "equity_ratio": round(equity_ratio, 1) if equity_ratio is not None else None,
             "op_margin": round(op_margin, 1) if op_margin is not None else None,
