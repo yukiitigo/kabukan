@@ -277,74 +277,34 @@ async def dividend_yield(code: str, dividend: float = 0):
 async def verify_stocks():
     import collections
     headers = {"x-api-key": JQUANTS_API_KEY}
-    used, items = None, []
-    for url in ["https://api.jquants.com/v2/equities/info",
-                "https://api.jquants.com/v2/listed/info",
-                "https://api.jquants.com/v1/listed/info"]:
-        try:
-            r = requests.get(url, headers=headers, timeout=30)
-            if r.status_code == 200:
-                j = r.json()
-                items = j.get("data") or j.get("info") or []
-                if items:
-                    used = url
-                    break
-        except Exception:
-            pass
-    if not items:
-        return JSONResponse(content={"error": "listed info not available"})
-    master = {}
-    for it in items:
-        c = str(it.get("Code") or it.get("code") or "")
-        n = it.get("CompanyName") or it.get("Name") or it.get("name") or ""
-        if c:
-            master[c] = n
-            if len(c) == 5 and c.endswith("0"):
-                master[c[:4]] = n
-    dup = [c for c, k in collections.Counter(s["code"] for s in STOCKS).items() if k > 1]
-    notfound, mismatch = [], []
-    for s in STOCKS:
-        official = master.get(s["code"])
-        if official is None:
-            notfound.append(s["code"] + " " + s["name"])
-        elif official.replace(" ", "").replace("　", "") != s["name"].replace(" ", "").replace("　", ""):
-            mismatch.append({"code": s["code"], "app": s["name"], "official": official})
-    return JSONResponse(content={"endpoint": used, "total": len(STOCKS),
-                                 "dup_count": len(dup), "duplicates": dup,
-                                 "notfound_count": len(notfound), "not_found": notfound,
-                                 "mismatch_count": len(mismatch), "name_mismatch": mismatch})
-@app.get("/verify-stocks")
-async def verify_stocks():
-    import collections
-    headers = {"x-api-key": JQUANTS_API_KEY}
     r = requests.get("https://api.jquants.com/v2/equities/master", headers=headers, timeout=60)
     if r.status_code != 200:
-        return JSONResponse(content={"error": "status %d" % r.status_code, "body": r.text[:300]})
+        return JSONResponse(content={"err": "status %d" % r.status_code, "body": r.text[:300]})
     j = r.json()
     items = j.get("data") or []
     if not items:
-        return JSONResponse(content={"error": "empty", "keys": list(j.keys())})
+        return JSONResponse(content={"err": "empty", "keys": list(j.keys()), "raw": str(j)[:300]})
     sample = items[0]
     ckey = next((k for k in sample if k.lower() in ("code", "localcode", "c")), None)
     nkey = next((k for k in sample if "name" in k.lower() and "eng" not in k.lower()), None)
     if not ckey or not nkey:
-        return JSONResponse(content={"error": "field not detected", "sample": sample})
+        return JSONResponse(content={"err": "field not detected", "sample": sample})
     master = {}
     for it in items:
         c = str(it.get(ckey) or "")
-        n = it.get(nkey) or ""
+        nm = it.get(nkey) or ""
         if c:
-            master[c] = n
+            master[c] = nm
             if len(c) == 5 and c.endswith("0"):
-                master[c[:4]] = n
+                master[c[:4]] = nm
     dup = [c for c, k in collections.Counter(s["code"] for s in STOCKS).items() if k > 1]
-    notfound, mismatch = [], []
+    nf, mm = [], []
     for s in STOCKS:
         o = master.get(s["code"])
         if o is None:
-            notfound.append(s["code"] + " " + s["name"])
-        elif o.replace(" ", "").replace("　", "") != s["name"].replace(" ", "").replace("　", ""):
-            mismatch.append({"code": s["code"], "app": s["name"], "official": o})
+            nf.append(s["code"] + " " + s["name"])
+        elif o.replace(" ", "").replace("\u3000", "") != s["name"].replace(" ", "").replace("\u3000", ""):
+            mm.append({"code": s["code"], "app": s["name"], "official": o})
     return JSONResponse(content={"master_count": len(items), "code_key": ckey, "name_key": nkey,
                                  "sample": sample, "total": len(STOCKS), "duplicates": dup,
-                                 "not_found": notfound, "name_mismatch": mismatch})
+                                 "not_found": nf, "name_mismatch": mm})
