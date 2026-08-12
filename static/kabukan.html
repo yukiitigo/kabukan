@@ -217,18 +217,26 @@ body{padding-bottom:24px}
 
 .jgray{background:#1F1F1F;color:#A8A8A8;border:1px solid rgba(255,255,255,0.20);padding:8px 16px;border-radius:999px;font-size:18px;font-weight:bold;white-space:nowrap}
 .cgray{color:#A8A8A8}
+
+.cdesc{font-size:12px;color:#7C8591;line-height:1.55;margin-top:4px;font-weight:400}
+.crow{align-items:flex-start}
+.chead,.crow{grid-template-columns:1.55fr 0.85fr 1.05fr 42px}
+@media(max-width:480px){
+ .cdesc{font-size:10px;line-height:1.5;margin-top:3px}
+ .chead,.crow{grid-template-columns:1.5fr 0.8fr 0.95fr 30px;gap:5px}
+}
 </style></head><body><h1>KABUKAN</h1><div class="tabs"><div class="tab active" onclick="showTab('watch')">監視銘柄</div><div class="tab" onclick="showTab('hold')">保存株</div><div class="tab" onclick="showTab('dividend')">配当</div></div><div id="watch" class="section active"><div class="sw"><input id="inp" placeholder="銘柄名を入力" oninput="doSearch(this.value)"><div id="drop"></div></div><div id="cards"></div><div class="upd" id="upd"></div></div><div id="hold" class="section"><div id="hold-form"><input id="hname" placeholder="銘柄名"><input id="hcode" placeholder="銘柄コード (例: 7203)"><input id="hprice" placeholder="取得単価 (円)" type="number"><button onclick="addHold()">追加</button></div><div id="hcards"></div></div><div id="dividend" class="section"><div id="div-form"><input id="div-name" placeholder="銘柄名"><input id="div-code" placeholder="銘柄コード (例: 2914)"><input id="div-dividend" placeholder="年間配当金 (円)" type="number"><input id="div-price" placeholder="購入単価 (円)" type="number"><button onclick="addDividend()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>追加</button></div><div id="dcards"></div></div><div class="modal" id="infoModal"><div class="modal-box info-box"><h3 id="infoTitle"></h3><div id="infoBody"></div><div class="modal-btns"><button class="btn-cancel" onclick="closeInfo()">閉じる</button></div></div></div><div class="modal" id="editModal"><div class="modal-box"><h3>取得単価を修正</h3><input type="number" id="editPrice" placeholder="新しい取得単価"><div class="modal-btns"><button class="btn-ok" onclick="saveEdit()">保存</button><button class="btn-cancel" onclick="closeEdit()">キャンセル</button></div></div></div><div class="modal" id="editDivModal"><div class="modal-box"><h3>配当情報を修正</h3><input type="number" id="editDivDividend" placeholder="年間配当金"><input type="number" id="editDivPrice" placeholder="購入単価"><div class="modal-btns"><button class="btn-ok" onclick="saveDivEdit()">保存</button><button class="btn-cancel" onclick="closeDivEdit()">キャンセル</button></div></div></div><script src="https://cdn.jsdelivr.net/npm/chart.js"></script><script>const B='https://kabukan.onrender.com';var QMAP={},FVMAP={};let C=[],H=JSON.parse(localStorage.getItem('holds')||'[]'),D=JSON.parse(localStorage.getItem('dividends')||'[]'),editIdx=-1;function loadStocks(){C=JSON.parse(localStorage.getItem('stocks')||'[]');load()}function loadDividends(){D=JSON.parse(localStorage.getItem('dividends')||'[]');renderDividends()}function showTab(t){localStorage.setItem('activeTab',t);document.querySelectorAll('.tab').forEach((x,i)=>{x.classList.toggle('active',['watch','hold','dividend'][i]===t)});document.querySelectorAll('.section').forEach(x=>x.classList.remove('active'));document.getElementById(t).classList.add('active');if(t==='hold')renderHolds();if(t==='dividend')loadDividends();syncNav(t)}var CHF=window.innerWidth<=480?9:16;function syncNav(t){var m={watch:'bn-watch',hold:'bn-hold',dividend:'bn-dividend'};document.querySelectorAll('.bn').forEach(function(x){x.classList.remove('active')});var e=document.getElementById(m[t]);if(e)e.classList.add('active')}function closeInfo(){document.getElementById('infoModal').classList.remove('show')}
 function openInfo(t,h){document.getElementById('infoTitle').textContent=t;document.getElementById('infoBody').innerHTML=h;document.getElementById('infoModal').classList.add('show')}
-function ckrow(l,v,r,ok){return '<div class="crow"><div class="clab">'+l+'</div><div class="cval">'+v+'</div><div class="crule">'+r+'</div><div class="cok '+(ok?'okY':'okN')+'">'+(ok?'\u25CB':'\u2715')+'</div></div>'}
+function ckrow(l,v,r,ok,d){return '<div class="crow"><div class="clab">'+l+(d?'<div class="cdesc">'+d+'</div>':'')+'</div><div class="cval">'+v+'</div><div class="crule">'+r+'</div><div class="cok '+(ok?'okY':'okN')+'">'+(ok?'\u25CB':'\u2715')+'</div></div>'}
 function rcls(x){return x==='判定不能'?'cgray':(x==='優良'||x==='買い候補'?'up':(x==='要注意'||x==='警戒'?'dn':'gold'))}
 function showFund(code){var fv=FVMAP[code],q=QMAP[code]||{};
 if(!fv){openInfo('ファンダメンタルズ判定','<p class="cnote">財務データを取得中です。数秒後にもう一度タップしてください。</p>');return}
 if(fv.error){openInfo('ファンダメンタルズ判定','<p class="cnote">財務データを取得できませんでした。<br>('+fv.error+')</p>');return}
 var h='<div class="chead"><div class="clab">指標</div><div class="cval">実測値</div><div class="crule">判定基準</div><div class="cok">達成</div></div>';
-h+=ckrow('ROE',fv.roe!=null?fv.roe+'%':'--','15〜30%',fv.roe!=null&&fv.roe>=15&&fv.roe<=30);
-h+=ckrow('自己資本比率',fv.equity_ratio!=null?fv.equity_ratio+'%':'--','40%以上',fv.equity_ratio!=null&&fv.equity_ratio>=40);
-h+=ckrow('純利益トレンド',fv.profit_trend||'--','前期比で増益',fv.profit_trend==='増益');
-h+=ckrow('営業利益率',fv.op_margin!=null?fv.op_margin+'%':'--','10%以上',fv.op_margin!=null&&fv.op_margin>=10);
+h+=ckrow('ROE',fv.roe!=null?fv.roe+'%':'--','15〜30%',fv.roe!=null&&fv.roe>=15&&fv.roe<=30,'自己資本利益率。純利益÷自己資本。株主が預けたお金で年に何%稼いだかを示す。高いほど資本効率が良い');
+h+=ckrow('自己資本比率',fv.equity_ratio!=null?fv.equity_ratio+'%':'--','40%以上',fv.equity_ratio!=null&&fv.equity_ratio>=40,'総資産のうち返済不要な自分のお金が占める割合。高いほど 借金に頼らず財務が安全');
+h+=ckrow('純利益トレンド',fv.profit_trend||'--','前期比で増益',fv.profit_trend==='増益','税金まで引いた最終的な儲けが、前の決算期より増えたか減ったか');
+h+=ckrow('営業利益率',fv.op_margin!=null?fv.op_margin+'%':'--','10%以上',fv.op_margin!=null&&fv.op_margin>=10,'売上のうち本業で残る利益の割合。高いほど値下げ競争に巻き込まれにくい');
 h+='<div class="cscore">スコア <b>'+fv.score+' / 4</b>　→　<b class="'+rcls(fv.rating)+'">'+fv.rating+'</b></div>';
 h+='<p class="cnote">3点以上 = 優良 ／ 2点 = 普通 ／ 1点以下 = 要注意<br>※ROEが30%を超える場合は財務レバレッジ過多の可能性があるため加点しません。'+(fv.available!=null&&fv.available<4?'<br>※財務データから評価できたのは '+fv.available+' / 4 項目です。':'')+(fv.rating==='判定不能'?'<br><b>※評価可能な指標が3項目未満のため、判定を保留しています。</b>':'')+'</p>';
 if(fv.fair_price){h+='<div class="csec">理論株価（過去平均PER・PBRの平均法）</div>';
@@ -244,9 +252,9 @@ if(!q){openInfo('売買判定','<p class="cnote">株価データを取得中で�
 var dv=q.deviation,vo=q.volume,av=q.avgVolume;
 var c1=(dv!=null&&dv<-5),c2=(vo!=null&&av!=null&&vo>av),c3=(dv!=null&&dv>10);
 var h='<div class="chead"><div class="clab">条件</div><div class="cval">実測値</div><div class="crule">判定基準</div><div class="cok">該当</div></div>';
-h+=ckrow('25日移動平均乖離率',dv!=null?dv+'%':'--','-5%未満',c1);
-h+=ckrow('出来高',vo!=null?vo.toLocaleString():'--','25日平均を上回る',c2);
-h+=ckrow('過熱感',dv!=null?dv+'%':'--','+10%超で警戒',c3);
+h+=ckrow('25日移動平均乖離率',dv!=null?dv+'%':'--','-5%未満',c1,'今の株価が直近25営業日の平均からどれだけ離れているか。マイナスは平均より安い状態');
+h+=ckrow('出来高',vo!=null?vo.toLocaleString():'--','25日平均を上回る',c2,'その日に売買が成立した株数。平均より多いと関心が高まっているサイン');
+h+=ckrow('過熱感',dv!=null?dv+'%':'--','+10%超で警戒',c3,'平均株価より上に離れすぎていないか。買われすぎは反落しやすい');
 h+='<div class="cscore">判定　→　<b class="'+rcls(q.judgment)+'">'+q.judgment+'</b></div>';
 h+='<p class="cnote"><b>買い候補</b> = 乖離率が-5%未満 かつ 出来高が25日平均超<br><b>警戒</b> = 乖離率が+10%超<br><b>中立</b> = 上記以外<br><b>判定不能</b> = 移動平均の算出に必要な20営業日分のデータが無い</p>';
 h+='<div class="csec">計算に使った値</div>';
