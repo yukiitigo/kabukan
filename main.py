@@ -102,7 +102,7 @@ async def quotes(codes: str = Query(...)):
                     judgment = "中立"
                 change = round(price - prev, 1) if price and prev else None
                 pct = round((price - prev) / prev * 100, 2) if price and prev else None
-                out.append({"code": code, "name": name, "price": price, "prevClose": prev, "change": change, "changePct": pct, "volume": vol, "deviation": deviation, "judgment": judgment})
+                out.append({"code": code, "name": name, "price": price, "prevClose": prev, "change": change, "changePct": pct, "volume": vol, "deviation": deviation, "judgment": judgment, "ma25": round(ma25, 1) if ma25 else None, "avgVolume": round(avg_vol) if avg_vol else None})
         except Exception as e:
             out.append({"code": code, "error": str(e)})
     return JSONResponse(content={"quotes": out}, media_type="application/json; charset=utf-8")
