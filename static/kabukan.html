@@ -225,6 +225,29 @@ body{padding-bottom:24px}
  .cdesc{font-size:10px;line-height:1.5;margin-top:3px}
  .chead,.crow{grid-template-columns:1.5fr 0.8fr 0.95fr 30px;gap:5px}
 }
+
+/* ===== モーダル: モバイルは縦積みレイアウトで大きく表示 ===== */
+@media(max-width:600px){
+ .modal{align-items:flex-start;padding:10px 0}
+ .modal-box{width:95%;max-width:none;padding:22px 18px}
+ .info-box{max-height:94vh;padding:22px 18px}
+ .modal-box h3{font-size:21px;margin-bottom:16px}
+ .chead{display:none}
+ .crow{display:grid;grid-template-columns:1fr 36px;grid-template-areas:"lab ok" "val val" "rule rule";gap:0 10px;padding:17px 0;align-items:start}
+ .clab{grid-area:lab;font-size:18px;font-weight:700;color:#FFFFFF;line-height:1.4}
+ .cdesc{font-size:14px;line-height:1.7;margin-top:8px;color:#9CA3AF;font-weight:400}
+ .cok{grid-area:ok;font-size:22px;align-self:start;text-align:right}
+ .cval{grid-area:val;font-size:17px;font-weight:600;margin-top:12px}
+ .crule{grid-area:rule;font-size:15px;margin-top:5px}
+ .cval::before{content:'実測値：';color:#9CA3AF;font-weight:400;font-size:15px}
+ .crule::before{content:'判定基準：';color:#9CA3AF;font-size:15px}
+ .cscore{font-size:19px;margin-top:20px}
+ .cnote{font-size:14px;line-height:1.9;margin-top:12px}
+ .csec{font-size:17px;margin-top:22px;padding-top:16px}
+ .crow2{font-size:16px;padding:9px 0}
+ .clist{font-size:14px;line-height:2}
+ .modal-btns button{height:50px;font-size:17px}
+}
 </style></head><body><h1>KABUKAN</h1><div class="tabs"><div class="tab active" onclick="showTab('watch')">監視銘柄</div><div class="tab" onclick="showTab('hold')">保存株</div><div class="tab" onclick="showTab('dividend')">配当</div></div><div id="watch" class="section active"><div class="sw"><input id="inp" placeholder="銘柄名を入力" oninput="doSearch(this.value)"><div id="drop"></div></div><div id="cards"></div><div class="upd" id="upd"></div></div><div id="hold" class="section"><div id="hold-form"><input id="hname" placeholder="銘柄名"><input id="hcode" placeholder="銘柄コード (例: 7203)"><input id="hprice" placeholder="取得単価 (円)" type="number"><button onclick="addHold()">追加</button></div><div id="hcards"></div></div><div id="dividend" class="section"><div id="div-form"><input id="div-name" placeholder="銘柄名"><input id="div-code" placeholder="銘柄コード (例: 2914)"><input id="div-dividend" placeholder="年間配当金 (円)" type="number"><input id="div-price" placeholder="購入単価 (円)" type="number"><button onclick="addDividend()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>追加</button></div><div id="dcards"></div></div><div class="modal" id="infoModal"><div class="modal-box info-box"><h3 id="infoTitle"></h3><div id="infoBody"></div><div class="modal-btns"><button class="btn-cancel" onclick="closeInfo()">閉じる</button></div></div></div><div class="modal" id="editModal"><div class="modal-box"><h3>取得単価を修正</h3><input type="number" id="editPrice" placeholder="新しい取得単価"><div class="modal-btns"><button class="btn-ok" onclick="saveEdit()">保存</button><button class="btn-cancel" onclick="closeEdit()">キャンセル</button></div></div></div><div class="modal" id="editDivModal"><div class="modal-box"><h3>配当情報を修正</h3><input type="number" id="editDivDividend" placeholder="年間配当金"><input type="number" id="editDivPrice" placeholder="購入単価"><div class="modal-btns"><button class="btn-ok" onclick="saveDivEdit()">保存</button><button class="btn-cancel" onclick="closeDivEdit()">キャンセル</button></div></div></div><script src="https://cdn.jsdelivr.net/npm/chart.js"></script><script>const B='https://kabukan.onrender.com';var QMAP={},FVMAP={};let C=[],H=JSON.parse(localStorage.getItem('holds')||'[]'),D=JSON.parse(localStorage.getItem('dividends')||'[]'),editIdx=-1;function loadStocks(){C=JSON.parse(localStorage.getItem('stocks')||'[]');load()}function loadDividends(){D=JSON.parse(localStorage.getItem('dividends')||'[]');renderDividends()}function showTab(t){localStorage.setItem('activeTab',t);document.querySelectorAll('.tab').forEach((x,i)=>{x.classList.toggle('active',['watch','hold','dividend'][i]===t)});document.querySelectorAll('.section').forEach(x=>x.classList.remove('active'));document.getElementById(t).classList.add('active');if(t==='hold')renderHolds();if(t==='dividend')loadDividends();syncNav(t)}var CHF=window.innerWidth<=480?9:16;function syncNav(t){var m={watch:'bn-watch',hold:'bn-hold',dividend:'bn-dividend'};document.querySelectorAll('.bn').forEach(function(x){x.classList.remove('active')});var e=document.getElementById(m[t]);if(e)e.classList.add('active')}function closeInfo(){document.getElementById('infoModal').classList.remove('show')}
 function openInfo(t,h){document.getElementById('infoTitle').textContent=t;document.getElementById('infoBody').innerHTML=h;document.getElementById('infoModal').classList.add('show')}
 function ckrow(l,v,r,ok,d){return '<div class="crow"><div class="clab">'+l+(d?'<div class="cdesc">'+d+'</div>':'')+'</div><div class="cval">'+v+'</div><div class="crule">'+r+'</div><div class="cok '+(ok?'okY':'okN')+'">'+(ok?'\u25CB':'\u2715')+'</div></div>'}
